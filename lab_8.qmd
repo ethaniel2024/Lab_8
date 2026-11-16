@@ -1,0 +1,147 @@
+---
+title: "Lab 8: Text Embeddings, Semantic Search, and Dimensionality Reduction"
+author: "STAT 386"
+format:
+  html:
+    toc: true
+    code-fold: false
+jupyter: python3
+---
+
+## Learning objectives
+
+By the end of this lab, you should be able to:
+
+- explain what a text embedding represents;
+- use PCA and UMAP to visualize high-dimensional text embeddings;
+- retrieve documents using cosine similarity;
+- distinguish retrieval in the original embedding space from visualization in two dimensions;
+- critically interpret semantic-search results and their limitations.
+
+## 1. Load the shared embeddings
+
+The instructor generated one embedding vector for each of the 33 regular talks in the October 2025 sample. The conference introduction and administrative sustaining item remain in the source CSV but are not included in the embedding matrix. The model and preprocessing choices are documented in the project README.
+
+```{python}
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from scripts.embedding_utils import (
+    load_shared_embeddings, cosine_rank, fit_reductions, embed_question
+)
+
+Path("figures").mkdir(exist_ok=True)
+X, talks, model_name = load_shared_embeddings()
+print("Embedding matrix shape:", X.shape)
+print("Model:", model_name)
+print("Number of talks:", len(talks))
+display(talks[["talk_name", "speaker", "embedding_chunks", "was_chunked"]].head())
+```
+
+**Check:** How many talks and embedding dimensions are present? Which talks were split into more than one chunk? Why did the instructor use chunking?
+
+## 2. Fit PCA
+
+Principal component analysis (PCA) finds orthogonal directions that explain variation in the original vectors. The first two components provide a two-dimensional view, but they are mathematical directions—not automatically meaningful human topics.
+
+```{python}
+pca, pca_xy, reducer, umap_xy = fit_reductions(X)
+print("Explained variance:", pca.explained_variance_ratio_)
+print("Total variance in first two components:", pca.explained_variance_ratio_.sum())
+
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.scatter(pca_xy[:, 0], pca_xy[:, 1], alpha=0.75)
+ax.set(title="October 2025 talks — PCA", xlabel="Principal component 1", ylabel="Principal component 2")
+ax.grid(alpha=0.2)
+fig.tight_layout()
+fig.savefig("figures/lab8_pca.png", dpi=160, bbox_inches="tight")
+plt.show()
+```
+
+**Interpretation:** What does the explained-variance proportion tell you? Why would it be misleading to label the axes “Faithfulness” and “Service” without additional analysis?
+
+## 3. Fit UMAP
+
+UMAP creates a nonlinear two-dimensional representation intended to preserve aspects of local structure. Its layout is useful for exploration, but distances in the plot are not a substitute for retrieval scores.
+
+```{python}
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.scatter(umap_xy[:, 0], umap_xy[:, 1], alpha=0.75)
+ax.set(title="October 2025 talks — UMAP", xlabel="UMAP 1", ylabel="UMAP 2")
+ax.grid(alpha=0.2)
+fig.tight_layout()
+fig.savefig("figures/lab8_umap.png", dpi=160, bbox_inches="tight")
+plt.show()
+```
+
+**Interpretation:** Describe one visible pattern or cluster. What additional evidence would you need before assigning a topic to that cluster?
+
+## 4. Ask your own question
+
+Write a focused gospel-related question that you would like to explore in the October 2025 conference talks. Avoid questions that can be answered only by a specific factual detail (for example, “Who spoke last?”).
+
+```{python}
+question = "How can disciples of Jesus Christ find peace during uncertainty?"  # Replace with your own question.
+query_vector = embed_question(question, model_name)
+print("Question:", question)
+print("Query vector dimensions:", query_vector.shape)
+```
+
+The query uses `search_query:` while the talk texts used `search_document:`. These prefixes identify the two different tasks for Nomic Embed Text v1.5.
+
+## 5. Retrieve the three most similar talks
+
+Rank talks using cosine similarity in the original embedding space—not Euclidean distance between points in the PCA or UMAP plots.
+
+```{python}
+top_three = cosine_rank(query_vector, X, talks, top_n=3)
+display(top_three[["talk_name", "speaker", "cosine_similarity", "link"]])
+```
+
+**Interpretation:** Why do these three talks appear relevant to your question? Read at least one full talk before deciding whether the similarity result is genuinely useful.
+
+## 6. Project the question into the two visualizations
+
+PCA and UMAP have already been fitted to the talk vectors. Their `transform` methods place the query in those fitted spaces. This is only a visualization step; the ranking above still comes from cosine similarity in the original embedding space.
+
+```{python}
+query_pca = pca.transform(query_vector.reshape(1, -1))
+query_umap = reducer.transform(query_vector.reshape(1, -1))
+top_ids = set(top_three["talk_id"].astype(str))
+top_mask = talks["talk_id"].astype(str).isin(top_ids).to_numpy()
+
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.scatter(pca_xy[~top_mask, 0], pca_xy[~top_mask, 1], alpha=0.45, label="Other talks")
+ax.scatter(pca_xy[top_mask, 0], pca_xy[top_mask, 1], marker="D", s=65, label="Top 3 by cosine similarity")
+ax.scatter(query_pca[:, 0], query_pca[:, 1], marker="*", s=240, label="Your question")
+ax.set(title="Question projected into PCA space", xlabel="Principal component 1", ylabel="Principal component 2")
+ax.legend()
+ax.grid(alpha=0.2)
+fig.tight_layout()
+fig.savefig("figures/lab8_pca_question.png", dpi=160, bbox_inches="tight")
+plt.show()
+
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.scatter(umap_xy[~top_mask, 0], umap_xy[~top_mask, 1], alpha=0.45, label="Other talks")
+ax.scatter(umap_xy[top_mask, 0], umap_xy[top_mask, 1], marker="D", s=65, label="Top 3 by cosine similarity")
+ax.scatter(query_umap[:, 0], query_umap[:, 1], marker="*", s=240, label="Your question")
+ax.set(title="Question projected into UMAP space", xlabel="UMAP 1", ylabel="UMAP 2")
+ax.legend()
+ax.grid(alpha=0.2)
+fig.tight_layout()
+fig.savefig("figures/lab8_umap_question.png", dpi=160, bbox_inches="tight")
+plt.show()
+```
+
+**Interpretation questions**
+
+1. Does the question appear near any of the three talks returned by cosine similarity?
+2. If the visual placement and cosine ranking seem inconsistent, which should determine the retrieval ranking, and why?
+3. What are two limitations of this small corpus or embedding approach?
+4. Why is semantic similarity not evidence that a talk is doctrinally correct or a definitive answer to your question?
+
+## 7. Final reflection
+
+In a short paragraph, explain one useful application of semantic search and one risk of relying on embedding similarity without reading the source material.
