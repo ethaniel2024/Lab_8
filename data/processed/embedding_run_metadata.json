@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-11-18T17:08:04.965571+00:00",
+  "model_name": "nomic-embed-text:v1.5",
+  "embedding_dimensions": 768,
+  "embedding_count": 33,
+  "document_prefix": "search_document:",
+  "query_prefix": "search_query:",
+  "ollama_model_context_tokens": 2048,
+  "chunking": {
+    "method": "sentence/word-boundary character chunks with overlap",
+    "max_characters_per_chunk": 4200,
+    "overlap_characters": 350,
+    "aggregation": "word-count-weighted mean followed by L2 normalization"
+  },
+  "source_file": "talks_october_2025_cleaned.csv",
+  "source_sha256": "802033ec003f53bc2679941a2d0185ffbeb8360f643154cd4e6e3bc36a057503"
+}
