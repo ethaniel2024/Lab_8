@@ -1,104 +1,121 @@
-# Lab 8 — Text Embeddings, Semantic Search, and Dimensionality Reduction
+# STAT 386 Lab 8: Intro to Machine Learning
 
-## Overview
+This lab continues the cumulative STAT 386 repository. Use the cleaned General Conference talk dataset produced in the previous labs to conduct exploratory analysis and communicate one finding with a polished figure.
 
-In this final lab, you will explore how text can be represented as numerical vectors. You will use a shared set of instructor-generated embeddings for 33 regular talks in the supplied October 2025 General Conference sample, fit PCA and UMAP, embed a gospel-related question, and retrieve the three talks most similar to that question.
+## Create your personal repository
 
-**Important:** semantic similarity is not a measure of doctrinal correctness, spiritual authority, or proof that a talk directly answers a question. Treat retrieval results as leads for human reading and interpretation.
+1. Click **Use this template** and select **Create a new repository**.
+2. For **Owner**, select `Stat386-Fall-2026`.
+3. Name your repository using the format `your_netid_lab_8`.
+4. Set the repository visibility to **Private**.
+5. Click **Create repository**.
 
-**Instructor release gate:** this ZIP contains the student materials and cleaned corpus, but not the real embedding cache. Before distributing it to students, run the instructor build steps below, run `uv run python scripts/validate_embeddings.py`, and include the three generated embedding artifacts in the student release.
+## Clone and set up the project
 
-## Corpus and preprocessing
-
-The supplied student-produced Lab 6 file contains 35 records:
-
-- 33 regular conference talks — included in the embedding corpus;
-- 1 conference introduction — retained in the CSV but excluded from embeddings;
-- 1 sustaining-of-authorities administrative item — retained in the CSV but excluded from embeddings.
-
-The processed file keeps all 35 records and includes an `include_in_embeddings` flag. For each regular talk, the publisher-provided opening synopsis is stored separately in `summary`; `text` contains the spoken address body used for embeddings. The original scraped text is retained in `text_raw` for auditability. `word_count` is computed from the cleaned spoken body, while `source_word_count` preserves the source file's count.
-
-The source CSV has no date values. Dates are left blank rather than inferred. The file is a student-produced sample, not a verified complete archive of every October 2025 address. An alternate 35-row student file was checked and had the same links and transcript text; a separate 794-row file covered 2010–2020 and was excluded because it is a different corpus. See `data/processed/dataset_cleaning_audit.md` for the source comparison, row-level inclusion, and remaining caveats.
-
-## Model choice and verified configuration
-
-This lab uses **Nomic Embed Text v1.5** through Ollama:
-
-```text
-nomic-embed-text:v1.5
-```
-
-The Ollama model registry lists this build with a 2,048-token context and 768-dimensional output. The upstream model card documents task prefixes: `search_document:` for corpus documents and `search_query:` for user queries. The build script uses those prefixes consistently. Because the Ollama package has a 2K context, long addresses are split conservatively into overlapping character chunks before embedding; they are not silently truncated. Chunk vectors are combined with a word-count-weighted mean and L2 normalization.
-
-References:
-
-- [Ollama model page and model metadata](https://ollama.com/library/nomic-embed-text:v1.5)
-- [Nomic Embed Text v1.5 model card and task prefixes](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5)
-- [Ollama embedding API](https://docs.ollama.com/api/embed)
-
-## Instructor: generate the shared embeddings
-
-Requirements: Python 3.10+, [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com/download), and [Quarto](https://quarto.org/docs/get-started/).
-
-From the Lab 8 project directory:
+Clone your personal repository inside your `STAT_386` folder:
 
 ```bash
-ollama pull nomic-embed-text:v1.5
-uv sync
-uv run python scripts/build_embeddings.py
-uv run python scripts/validate_embeddings.py
-```
-
-The script filters to `include_in_embeddings == True`, verifies that only regular talks are included, uses each talk's `link` as its stable ID, and saves three aligned files:
-
-- `data/processed/talk_embeddings.npz` — the numeric embedding matrix, talk IDs, and model name;
-- `data/processed/talk_embeddings_metadata.csv` — one metadata row per vector, in the same order;
-- `data/processed/embedding_run_metadata.json` — model, dimensions, chunking settings, timestamp, and source-file hash.
-
-Commit all three generated files together. Do not mix an NPZ file with a metadata CSV generated from a different run or dataset. The script reports the actual vector dimension returned by Ollama; for the specified model tag, expect 768.
-
-The script first attempts each complete address with truncation disabled. Only if Ollama reports a context-length error does it split that address into chunks (default maximum 4,200 characters, 350-character overlap). This is a conservative character-based safeguard for the Ollama build's 2K token context, not a claim that characters equal tokens. Chunk vectors are combined into one vector for that talk. Adjust only if you deliberately change the model/build and regenerate the complete corpus.
-
-**Release gate:** the shared embedding files are generated locally and are not bundled in this starter ZIP. Do not distribute the student copy until the instructor has run the build script successfully and committed the three generated files listed above.
-
-## Student setup
-
-Students do not need to regenerate the corpus embeddings, but they do need Ollama and the same model to embed their own question.
-
-```bash
-ollama pull nomic-embed-text:v1.5
+git clone <your-repository-url>
+cd <your-repository-name>
 uv sync
 ```
 
-Install Quarto separately if you want to render the `.qmd` to HTML. Then run:
+The first time you run `uv sync`, it will create a `uv.lock` file. Include that file in your commits.
 
-```bash
-uv run quarto render lab_8.qmd
-```
+Open the repository folder in Positron. Select the Python interpreter inside the `.venv` folder created by `uv`.
 
-If Quarto does not automatically find the environment's Python kernel, register it once:
 
-```bash
-uv run python -m ipykernel install --user --name stat386-lab8
-```
+## Complete the lab
 
-Do not substitute another embedding model for the query. The query vector must be generated by the same model and dimensions as the shared talk vectors.
+Open `lab_8.qmd` and replace `Your Name` with your name. Work through the sections in order.
 
-## Student workflow
+Begin by loading the provided October 2025 General Conference talk dataset and shared embedding cache:
 
-1. Load the shared embedding matrix and aligned metadata.
-2. Inspect the number of talks and embedding dimensions.
-3. Fit PCA and visualize the first two principal components.
-4. Fit UMAP and visualize its two-dimensional layout.
-5. Write your own gospel-related question and embed it with the same model using `search_query:`.
-6. Rank talks by cosine similarity in the **original embedding space** and report the top three.
-7. Transform the query into the already-fitted PCA and UMAP spaces and plot it as a separate marker.
-8. Compare the retrieval results with the plots. Explain why 2D proximity is not the retrieval method.
+- `data/processed/talks_october_2025_cleaned.csv`
+- `data/processed/talk_embeddings.npz`
+- `data/processed/talk_embeddings_metadata.csv`
 
-## Submission
+The shared embedding cache contains vectors for 33 regular conference talks, generated using the `nomic-embed-text:v1.5` model. You do not need to scrape the website or regenerate the talk embeddings. The cache has already been generated and validated for this lab.
 
-Commit the completed `lab_8.qmd`, rendered HTML (if requested by your instructor), and both PCA and UMAP figures. Answer the interpretation questions in the QMD. Include your question and the top-three retrieval results.
+Complete the data and embedding checks, examine the structure of the embedding space, and use PCA and UMAP to explore how the talks relate to one another. Then formulate your own gospel-related question, generate an embedding for that question using the same model, and use cosine similarity to identify the three most relevant talks.
 
-## Reproducibility and interpretation
+**Data input:** Use the cleaned dataset and shared embedding files provided in `data/processed/`. Do not replace these files with raw scraped data or attempt to regenerate the shared talk embeddings.
 
-PCA and UMAP are fitted by each student. UMAP can vary with package versions and settings, so exact layouts may differ. The relative orientation, rotation, and distances in a two-dimensional visualization should not be overinterpreted. Use cosine similarity on the original vectors for retrieval. UMAP's `transform` places a new query into the fitted visualization; it is not a retrieval algorithm.
+**Query embedding:** You will need Ollama and the `nomic-embed-text:v1.5` model installed locally to generate an embedding for your own question. Use the required `search_query:` prefix when embedding your question. The shared talk embeddings use the corresponding `search_document:` prefix.
+
+You can preview your document with:
+
+    uv run quarto preview lab_8.qmd
+
+Stop the preview by pressing `Ctrl+C` in the terminal. Make several meaningful commits as you work. For example:
+
+    git add lab_8.qmd
+    git commit -m "Complete embedding exploration"
+    git push
+
+## Work with the AI Collaborator
+
+After completing your embedding exploration and semantic search, commit and push your work. You will then review two proposed changes to your lab code. Each interaction creates a Pull Request.
+
+Both reviews ask you to evaluate a proposed change related to the embedding analysis. Inspect the proposed code, consider its effect on the analysis and interpretation, and decide whether the change is appropriate.
+
+You are evaluated on your reasoning and ability to interpret semantic relationships responsibly, not simply on whether you accept or reject a proposed change.
+
+### First AI Collaborator interaction
+
+Create a new Issue using the **Lab 8 Complete** Issue template. If the template is unavailable, create a regular Issue titled `Lab 8 complete`; its description can be empty.
+
+Post the following command as a **new comment**, not in the Issue description:
+
+    @local-llm-user process config-dir: Lab_8/metadata_01.yml in instructor-repo: Stat386-Fall-2026/Instructor_Repo
+
+Once the collaborator creates a Pull Request:
+
+1. Read the Pull Request description.
+2. Inspect the proposed code in **Files changed**.
+3. Answer every review question in a comment on that Pull Request.
+4. Explain whether the proposed addition fits the lab and supports a reasonable interpretation of the embedding results.
+5. Merge the Pull Request if appropriate, or close the Pull Request without merging if inappropriate.
+
+You are evaluated on your reasoning, not on accepting the change. You do not need to execute a proposed analysis simply to evaluate its design or interpretation.
+
+If you merge the Pull Request, update your local repository before continuing:
+
+    git pull
+
+### Second AI Collaborator interaction
+
+After reviewing the first Pull Request, return to the **same Lab 8 completion Issue**. If the Issue was closed automatically, reopen it before posting the next command.
+
+Post the following command as a new comment:
+
+    @local-llm-user process config-dir: Lab_8/metadata_02.yml in instructor-repo: Stat386-Fall-2026/Instructor_Repo
+
+Review the second Pull Request using the same process. Answer all questions in a comment and explain your decision to merge or close it. If you merge it, run `git pull` again.
+
+## Render and submit
+
+After both reviews, render the final document from a fresh session:
+
+    uv run quarto render lab_8.qmd
+
+Commit and push your completed document, rendered HTML, dependency lockfile, and any other required work products:
+
+    git add lab_8.qmd lab_8.html uv.lock
+    git commit -m "Complete Lab 8"
+    git push
+
+Follow the submission directions provided in Canvas.
+
+## Deliverables
+
+- Completed `lab_8.qmd`.
+- Completed data and embedding validation.
+- PCA and UMAP exploration of the talk embeddings.
+- One original gospel-related query embedded using the required model.
+- The three most similar talks identified using cosine similarity.
+- A projection of your query into the PCA and UMAP spaces.
+- A concise interpretation and discussion of limitations.
+- A response to both AI Collaborator reviews.
+
+This is an exploratory analysis of semantic similarity. Similarity scores indicate how closely the model represents two pieces of text in its embedding space; they do not establish doctrinal correctness, prove that a talk answers your question, or measure the spiritual importance of a topic. Interpret the results thoughtfully and acknowledge the limitations of using an embedding model to represent religious discourse.
